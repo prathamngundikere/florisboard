@@ -19,6 +19,7 @@ package dev.patrickgold.florisboard.ime.smartbar.quickaction
 import android.content.Context
 import androidx.compose.runtime.Composable
 import dev.patrickgold.florisboard.R
+import dev.patrickgold.florisboard.chatspy.ChatSpyManager
 import dev.patrickgold.florisboard.editorInstance
 import dev.patrickgold.florisboard.ime.keyboard.ComputingEvaluator
 import dev.patrickgold.florisboard.ime.keyboard.KeyData
@@ -36,6 +37,17 @@ sealed class QuickAction {
     open fun onPointerUp(context: Context) = Unit
 
     open fun onPointerCancel(context: Context) = Unit
+
+    @Serializable
+    @SerialName("chat_spy_toggle")
+    object ChatSpyToggle : QuickAction() {
+        override fun onPointerUp(context: Context) {
+           ChatSpyManager.toggleSpying()
+            val isEnabled = ChatSpyManager.isSpyingEnabled.value
+            val stateText = if (isEnabled) "ON" else "OFF"
+            android.widget.Toast.makeText(context, "Chat Spy: $stateText", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     @Serializable
     @SerialName("insert_key")
@@ -77,6 +89,7 @@ fun QuickAction.keyData(): KeyData {
 @Composable
 fun QuickAction.computeDisplayName(evaluator: ComputingEvaluator): String {
     return when (this) {
+        is QuickAction.ChatSpyToggle -> "Spy"
         is QuickAction.InsertKey -> stringRes(when (data.code) {
             KeyCode.ARROW_UP -> R.string.quick_action__arrow_up
             KeyCode.ARROW_DOWN -> R.string.quick_action__arrow_down
@@ -118,6 +131,7 @@ fun QuickAction.computeDisplayName(evaluator: ComputingEvaluator): String {
 @Composable
 fun QuickAction.computeTooltip(evaluator: ComputingEvaluator): String {
     return when (this) {
+        is QuickAction.ChatSpyToggle -> "Fetch latest chat message"
         is QuickAction.InsertKey -> stringRes(when (data.code) {
             KeyCode.ARROW_UP -> R.string.quick_action__arrow_up__tooltip
             KeyCode.ARROW_DOWN -> R.string.quick_action__arrow_down__tooltip
