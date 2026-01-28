@@ -1132,6 +1132,8 @@
     <string name="unit__percent__symbol" translatable="false">{v}%</string>
     <string name="unit__display_pixel__symbol" translatable="false">{v} dp</string>
     <string name="unit__display_pixel_per_seconds__symbol" translatable="false">{v} dp/s</string>
+    <string name="spy">Spy</string>
+    <string name="fetch_latest_chat_message">Fetch latest chat message</string>
 
     <!-- Unit strings (written words) -->
     <plurals name="unit__hours__written">

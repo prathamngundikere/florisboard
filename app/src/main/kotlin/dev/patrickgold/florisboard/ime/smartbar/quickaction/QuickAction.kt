@@ -18,8 +18,8 @@ package dev.patrickgold.florisboard.ime.smartbar.quickaction
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import dev.patrickgold.florisboard.R
-import dev.patrickgold.florisboard.chatspy.ChatSpyManager
 import dev.patrickgold.florisboard.editorInstance
 import dev.patrickgold.florisboard.ime.keyboard.ComputingEvaluator
 import dev.patrickgold.florisboard.ime.keyboard.KeyData
@@ -37,17 +37,6 @@ sealed class QuickAction {
     open fun onPointerUp(context: Context) = Unit
 
     open fun onPointerCancel(context: Context) = Unit
-
-    @Serializable
-    @SerialName("chat_spy_toggle")
-    object ChatSpyToggle : QuickAction() {
-        override fun onPointerUp(context: Context) {
-           ChatSpyManager.toggleSpying()
-            val isEnabled = ChatSpyManager.isSpyingEnabled.value
-            val stateText = if (isEnabled) "ON" else "OFF"
-            android.widget.Toast.makeText(context, "Chat Spy: $stateText", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
 
     @Serializable
     @SerialName("insert_key")
@@ -89,7 +78,6 @@ fun QuickAction.keyData(): KeyData {
 @Composable
 fun QuickAction.computeDisplayName(evaluator: ComputingEvaluator): String {
     return when (this) {
-        is QuickAction.ChatSpyToggle -> "Spy"
         is QuickAction.InsertKey -> stringRes(when (data.code) {
             KeyCode.ARROW_UP -> R.string.quick_action__arrow_up
             KeyCode.ARROW_DOWN -> R.string.quick_action__arrow_down
@@ -116,6 +104,7 @@ fun QuickAction.computeDisplayName(evaluator: ComputingEvaluator): String {
             // TODO: In the future this will be merged into the resize keyboard panel, for now it is a separate action
             KeyCode.TOGGLE_COMPACT_LAYOUT -> R.string.quick_action__one_handed_mode
             KeyCode.TOGGLE_RESIZE_MODE -> R.string.quick_action__resize_mode
+            KeyCode.SPY -> R.string.spy
             KeyCode.DRAG_MARKER -> if (evaluator.state.debugShowDragAndDropHelpers) {
                 R.string.quick_action__drag_marker
             } else {
@@ -131,7 +120,6 @@ fun QuickAction.computeDisplayName(evaluator: ComputingEvaluator): String {
 @Composable
 fun QuickAction.computeTooltip(evaluator: ComputingEvaluator): String {
     return when (this) {
-        is QuickAction.ChatSpyToggle -> "Fetch latest chat message"
         is QuickAction.InsertKey -> stringRes(when (data.code) {
             KeyCode.ARROW_UP -> R.string.quick_action__arrow_up__tooltip
             KeyCode.ARROW_DOWN -> R.string.quick_action__arrow_down__tooltip
@@ -154,6 +142,7 @@ fun QuickAction.computeTooltip(evaluator: ComputingEvaluator): String {
             KeyCode.VOICE_INPUT -> R.string.quick_action__voice_input__tooltip
             KeyCode.IME_HIDE_UI -> R.string.quick_action__ime_hide_ui__tooltip
             KeyCode.TOGGLE_FLOATING_WINDOW -> R.string.quick_action__floating_window_mode__tooltip
+            KeyCode.SPY -> R.string.fetch_latest_chat_message
             // TODO: In the future this will be merged into the resize keyboard panel, for now it is a separate action
             KeyCode.TOGGLE_COMPACT_LAYOUT -> R.string.quick_action__one_handed_mode__tooltip
             KeyCode.TOGGLE_RESIZE_MODE -> R.string.quick_action__resize_mode__tooltip

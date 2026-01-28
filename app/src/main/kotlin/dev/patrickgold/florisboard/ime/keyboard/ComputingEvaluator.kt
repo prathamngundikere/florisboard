@@ -182,6 +182,9 @@ fun ComputingEvaluator.computeLabel(data: KeyData): String? {
 fun ComputingEvaluator.computeImageVector(data: KeyData): ImageVector? {
     val evaluator = this
     return when (data.code) {
+        KeyCode.SPY -> {
+            context()?.vectorResource(id = R.drawable.outline_anchor_24)
+        }
         KeyCode.ARROW_LEFT -> {
             Icons.AutoMirrored.Filled.KeyboardArrowLeft
         }

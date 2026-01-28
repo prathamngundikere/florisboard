@@ -151,10 +151,6 @@ fun QuickActionButton(
                             text = action.data.firstOrNull().toString().ifBlank { "?" },
                         )
                     }
-
-                    is QuickAction.ChatSpyToggle -> {
-                        dev.patrickgold.florisboard.R.drawable.outline_anchor_24
-                    }
                 }
 
                 // Render additional info if this is a tile

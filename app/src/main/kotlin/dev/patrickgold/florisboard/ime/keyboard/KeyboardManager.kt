@@ -27,6 +27,7 @@ import dev.patrickgold.florisboard.FlorisImeService
 import dev.patrickgold.florisboard.R
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
 import dev.patrickgold.florisboard.appContext
+import dev.patrickgold.florisboard.chatspy.ChatSpyManager
 import dev.patrickgold.florisboard.clipboardManager
 import dev.patrickgold.florisboard.editorInstance
 import dev.patrickgold.florisboard.extensionManager
@@ -171,6 +172,20 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
             prefs.devtools.showDragAndDropHelpers.asFlow().collectLatestIn(scope) {
                 reevaluateDebugFlags()
             }
+            ChatSpyManager.capturedMessage.collectIn(scope) { message ->
+                scope.launch(Dispatchers.Main) {
+                    showSpyToast("Captured: $message")
+                }
+            }
+        }
+    }
+
+    private fun showSpyToast(message: String) {
+        scope.launch(Dispatchers.Main) {
+            lastToastReference.get()?.cancel()
+            val toast = Toast.makeText(appContext, message, Toast.LENGTH_SHORT)
+            toast.show()
+            lastToastReference = WeakReference(toast)
         }
     }
 
@@ -766,6 +781,12 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
             }
             KeyCode.TOGGLE_INCOGNITO_MODE -> scope.launch { handleToggleIncognitoMode() }
             KeyCode.TOGGLE_AUTOCORRECT -> handleToggleAutocorrect()
+            KeyCode.SPY -> {
+                ChatSpyManager.toggleSpying()
+                val isEnabled = ChatSpyManager.isSpyingEnabled.value
+                val message = if (isEnabled) "Spy Mode ON" else "Spy Mode OFF"
+                showSpyToast(message)
+            }
             KeyCode.UNDO -> editorInstance.performUndo()
             KeyCode.VIEW_CHARACTERS -> activeState.keyboardMode = KeyboardMode.CHARACTERS
             KeyCode.VIEW_NUMERIC -> activeState.keyboardMode = KeyboardMode.NUMERIC

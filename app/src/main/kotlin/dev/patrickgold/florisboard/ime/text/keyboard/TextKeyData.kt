@@ -159,6 +159,12 @@ data class TextKeyData(
             label = "unspecified",
         )
 
+        val SPY = TextKeyData(
+            type = KeyType.UNSPECIFIED,
+            code = KeyCode.SPY,
+            label = "spy",
+        )
+
         /** Predefined key data for [KeyCode.SPACE] */
         val SPACE = TextKeyData(
             type = KeyType.CHARACTER,

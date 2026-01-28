@@ -18,19 +18,25 @@ package dev.patrickgold.florisboard.chatspy
 
 import android.widget.Toast
 import android.content.Context
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 object ChatSpyManager {
     private val _isSpyingEnabled = MutableStateFlow(false)
     val isSpyingEnabled = _isSpyingEnabled.asStateFlow()
 
+    private val _capturedMessage = MutableSharedFlow<String>(replay = 0)
+    val capturedMessage = _capturedMessage.asSharedFlow()
+
     fun toggleSpying() {
         _isSpyingEnabled.value = !_isSpyingEnabled.value
     }
 
-    fun onMessageClicked(context: Context, text: String, appName: String) {
+    suspend fun onMessageClicked(text: String, appName: String) {
         if (!_isSpyingEnabled.value) return
-        Toast.makeText(context, "Captured: $text", Toast.LENGTH_LONG).show()
+        _capturedMessage.emit(text)
+        _isSpyingEnabled.value = false
     }
 }
