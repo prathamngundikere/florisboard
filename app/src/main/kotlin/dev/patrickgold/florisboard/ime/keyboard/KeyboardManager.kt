@@ -22,6 +22,7 @@ import android.view.KeyEvent
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.patrickgold.florisboard.FlorisImeService
 import dev.patrickgold.florisboard.R
@@ -99,6 +100,8 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
 
     val resources = KeyboardManagerResources()
     val activeState = ObservableKeyboardState.new()
+
+    var spyCapturedText by mutableStateOf<String?>(null)
     var smartbarVisibleDynamicActionsCount by mutableIntStateOf(0)
     private var lastToastReference = WeakReference<Toast>(null)
 
@@ -173,9 +176,7 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
                 reevaluateDebugFlags()
             }
             ChatSpyManager.capturedMessage.collectIn(scope) { message ->
-                scope.launch(Dispatchers.Main) {
-                    showSpyToast("Captured: $message")
-                }
+                spyCapturedText = message
             }
         }
     }
@@ -782,10 +783,13 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
             KeyCode.TOGGLE_INCOGNITO_MODE -> scope.launch { handleToggleIncognitoMode() }
             KeyCode.TOGGLE_AUTOCORRECT -> handleToggleAutocorrect()
             KeyCode.SPY -> {
-                ChatSpyManager.toggleSpying()
-                val isEnabled = ChatSpyManager.isSpyingEnabled.value
-                val message = if (isEnabled) "Spy Mode ON" else "Spy Mode OFF"
-                showSpyToast(message)
+                if (spyCapturedText != null) {
+                    // If text is currently showing, pressing the button closes it
+                    spyCapturedText = null
+                } else {
+                    // Otherwise, toggle the spy mode
+                    ChatSpyManager.toggleSpying()
+                }
             }
             KeyCode.UNDO -> editorInstance.performUndo()
             KeyCode.VIEW_CHARACTERS -> activeState.keyboardMode = KeyboardMode.CHARACTERS

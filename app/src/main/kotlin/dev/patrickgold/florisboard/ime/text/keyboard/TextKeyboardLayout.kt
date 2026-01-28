@@ -22,13 +22,19 @@ import android.content.Context
 import android.view.MotionEvent
 import android.view.animation.AccelerateInterpolator
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -111,6 +117,7 @@ fun TextKeyboardLayout(
 ): Unit = with(LocalDensity.current) {
     val prefs by FlorisPreferenceStore
     val context = LocalContext.current
+    val keyboardManager by context.keyboardManager()
     val configuration = LocalConfiguration.current
     val glideTypingManager by context.glideTypingManager()
 
@@ -165,6 +172,10 @@ fun TextKeyboardLayout(
                 controller.size = coords.size.toSize()
             }
             .pointerInteropFilter { event ->
+                // This allows touches to pass through to the ScrollView and Button
+                if (keyboardManager.spyCapturedText != null) {
+                    return@pointerInteropFilter false
+                }
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN,
                     MotionEvent.ACTION_POINTER_DOWN,
@@ -246,63 +257,107 @@ fun TextKeyboardLayout(
         }
 
         val desiredKeyHack = rememberUpdatedState(desiredKey) // TODO quick'n'dirty hack
-        val popupUiController = rememberPopupUiController(
-            key1 = keyboard,
-            key2 = Unit, // TODO quick'n'dirty hack
-            boundsProvider = { key ->
-                val keyPopupWidth: Float
-                val keyPopupHeight: Float
-                when {
-                    configuration.isOrientationLandscape() -> {
-                        keyPopupWidth = desiredKeyHack.value.visibleBounds.width * 1.0f
-                        keyPopupHeight = desiredKeyHack.value.visibleBounds.height * 3.0f
-                    }
-                    else -> {
-                        keyPopupWidth = desiredKeyHack.value.visibleBounds.width * 1.1f
-                        keyPopupHeight = desiredKeyHack.value.visibleBounds.height * 2.5f
-                    }
-                }
-                val keyPopupDiffX = (key.visibleBounds.width - keyPopupWidth) / 2.0f
-                FlorisRect.new().apply {
-                    left = key.visibleBounds.left + keyPopupDiffX
-                    top = key.visibleBounds.bottom - keyPopupHeight
-                    right = left + keyPopupWidth
-                    bottom = top + keyPopupHeight
-                }
-            },
-            isSuitableForBasicPopup = { key ->
-                if (key is TextKey) {
-                    val keyCode = key.computedData.code
-                    val keyType = key.computedData.type
-                    val numeric = keyboard.mode == KeyboardMode.NUMERIC ||
-                        keyboard.mode == KeyboardMode.PHONE || keyboard.mode == KeyboardMode.PHONE2 ||
-                        keyboard.mode == KeyboardMode.NUMERIC_ADVANCED && keyType == KeyType.NUMERIC
-                    keyCode > KeyCode.SPACE && keyCode != KeyCode.CJK_SPACE && !numeric
-                } else {
-                    true
-                }
-            },
-            isSuitableForExtendedPopup = { key ->
-                if (key is TextKey) {
-                    val keyCode = key.computedData.code
-                    keyCode > KeyCode.SPACE && keyCode != KeyCode.CJK_SPACE || ExceptionsForKeyCodes.contains(keyCode)
-                } else {
-                    true
-                }
-            },
-        )
-        popupUiController.evaluator = evaluator
-        popupUiController.keyHintConfiguration = prefs.keyboard.keyHintConfiguration()
-        controller.popupUiController = popupUiController
-        val debugShowTouchBoundaries by prefs.devtools.showKeyTouchBoundaries.observeAsState()
-        for (textKey in keyboard.keys()) {
-            TextKeyButton(
-                textKey, evaluator, desiredKey,
-                debugShowTouchBoundaries,
-            )
-        }
+        val spyText = keyboardManager.spyCapturedText
+        if (spyText != null) {
+            // --- SPY VIEW MODE ---
+            SnyggBox(
+                elementName = FlorisImeUi.WindowInner.elementName,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(FlorisImeSizing.keyboardUiHeight())
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // 1. The Captured Text (Scrollable)
+                    SnyggText(
+                        text = spyText.toString(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    )
 
-        popupUiController.RenderPopups()
+                    // 2. The Send Button
+                    SnyggBox(
+                        elementName = "key", // Reusing 'key' style for button look
+                        modifier = Modifier
+                            .height(FlorisImeSizing.keyboardRowBaseHeight * 0.8f) // Approx button height
+                            .fillMaxWidth(0.5f)
+                            .clickable {
+                                // Logic kept empty as requested
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SnyggText(text = "Send")
+                    }
+                }
+            }
+        } else {
+            val popupUiController = rememberPopupUiController(
+                key1 = keyboard,
+                key2 = Unit, // TODO quick'n'dirty hack
+                boundsProvider = { key ->
+                    val keyPopupWidth: Float
+                    val keyPopupHeight: Float
+                    when {
+                        configuration.isOrientationLandscape() -> {
+                            keyPopupWidth = desiredKeyHack.value.visibleBounds.width * 1.0f
+                            keyPopupHeight = desiredKeyHack.value.visibleBounds.height * 3.0f
+                        }
+
+                        else -> {
+                            keyPopupWidth = desiredKeyHack.value.visibleBounds.width * 1.1f
+                            keyPopupHeight = desiredKeyHack.value.visibleBounds.height * 2.5f
+                        }
+                    }
+                    val keyPopupDiffX = (key.visibleBounds.width - keyPopupWidth) / 2.0f
+                    FlorisRect.new().apply {
+                        left = key.visibleBounds.left + keyPopupDiffX
+                        top = key.visibleBounds.bottom - keyPopupHeight
+                        right = left + keyPopupWidth
+                        bottom = top + keyPopupHeight
+                    }
+                },
+                isSuitableForBasicPopup = { key ->
+                    if (key is TextKey) {
+                        val keyCode = key.computedData.code
+                        val keyType = key.computedData.type
+                        val numeric = keyboard.mode == KeyboardMode.NUMERIC ||
+                            keyboard.mode == KeyboardMode.PHONE || keyboard.mode == KeyboardMode.PHONE2 ||
+                            keyboard.mode == KeyboardMode.NUMERIC_ADVANCED && keyType == KeyType.NUMERIC
+                        keyCode > KeyCode.SPACE && keyCode != KeyCode.CJK_SPACE && !numeric
+                    } else {
+                        true
+                    }
+                },
+                isSuitableForExtendedPopup = { key ->
+                    if (key is TextKey) {
+                        val keyCode = key.computedData.code
+                        keyCode > KeyCode.SPACE && keyCode != KeyCode.CJK_SPACE || ExceptionsForKeyCodes.contains(
+                            keyCode
+                        )
+                    } else {
+                        true
+                    }
+                },
+            )
+            popupUiController.evaluator = evaluator
+            popupUiController.keyHintConfiguration = prefs.keyboard.keyHintConfiguration()
+            controller.popupUiController = popupUiController
+            val debugShowTouchBoundaries by prefs.devtools.showKeyTouchBoundaries.observeAsState()
+            for (textKey in keyboard.keys()) {
+                TextKeyButton(
+                    textKey, evaluator, desiredKey,
+                    debugShowTouchBoundaries,
+                )
+            }
+
+            popupUiController.RenderPopups()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -421,6 +476,9 @@ private class TextKeyboardLayoutController(
         keyboardManager.activeState.keyVariation != KeyVariation.PASSWORD
 
     fun onTouchEventInternal(event: MotionEvent) {
+        if (keyboardManager.spyCapturedText != null) {
+            return
+        }
         flogDebug { "event=$event" }
         swipeGestureDetector.onTouchEvent(event)
         if (isGlideEnabled && keyboard.mode == KeyboardMode.CHARACTERS) {
